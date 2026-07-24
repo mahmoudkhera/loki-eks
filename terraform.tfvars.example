@@ -1,0 +1,33 @@
+# Copy to terraform.tfvars and edit.
+
+region       = "us-east-1"
+cluster_name = "stockwatch"
+environment  = "dev"
+
+# Create on the newest version available. See the README before changing.
+kubernetes_version = "1.36"
+
+# ---- Cheapest viable setup (the defaults) --------------------------------
+enable_nat_gateway = false      # nodes in public subnets, saves ~$33/mo
+capacity_type      = "SPOT"     # ~70% off on-demand
+node_architecture  = "x86_64"   # switch to "arm64" only if your images are multi-arch
+node_min_size      = 1
+node_desired_size  = 2
+node_max_size      = 3
+node_disk_size     = 20
+
+# Restrict who can reach the Kubernetes API. Replace with your own IP.
+# Find it with:  curl -s https://checkip.amazonaws.com
+# public_access_cidrs = ["203.0.113.45/32"]
+
+# ---- Turn on only if you actually need them ------------------------------
+enable_ebs_csi_driver  = false  # needed for PersistentVolumeClaims
+enable_cluster_logging = false  # CloudWatch ingestion is ~$0.50/GB
+
+
+# ---- Production-shaped alternative (uncomment, roughly +$40/mo) ----------
+# enable_nat_gateway = true
+# single_nat_gateway = true      # one NAT for all AZs; cheaper, less resilient
+# capacity_type      = "ON_DEMAND"
+# node_min_size      = 2
+# node_desired_size  = 3
