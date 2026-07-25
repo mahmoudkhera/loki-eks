@@ -139,3 +139,21 @@ module "ebs_csi_irsa" {
     }
   }
 }
+
+# IRSA role for the AWS Load Balancer Controller, created only when enabled.
+module "lb_controller_irsa" {
+  count = var.enable_lb_controller ? 1 : 0
+
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.48"
+
+  role_name                              = "${var.cluster_name}-lb-controller"
+  attach_load_balancer_controller_policy = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+    }
+  }
+}

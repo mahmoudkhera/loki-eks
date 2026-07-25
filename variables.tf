@@ -172,3 +172,9 @@ variable "public_access_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+ variable "enable_lb_controller" {
+  description = "Install the AWS Load Balancer Controller for ALB/NLB provisioning."
+  type        = bool
+  default     = true
+}

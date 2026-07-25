@@ -1,3 +1,6 @@
+
+
+
 data "aws_availability_zones" "available" {
   state = "available"
 
@@ -27,6 +30,7 @@ module "vpc" {
   # /20 per subnet = 4091 usable IPs. The VPC CNI assigns a real VPC IP to every
   # pod, so subnets that feel oversized for the node count are correct here -
   # running out of IPs is a classic EKS failure and costs nothing to prevent.
+  
   public_subnets  = [for i in range(var.az_count) : cidrsubnet(var.vpc_cidr, 4, i)]
   private_subnets = [for i in range(var.az_count) : cidrsubnet(var.vpc_cidr, 4, i + 8)]
 
