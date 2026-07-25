@@ -1,8 +1,7 @@
 
 
 namespaces: stock
-
+appName: stockwatch
 ingress: 
   name: app-ingress
-  frontend_host: frontend.192.168.49.2.nip.io
-  inventory_host: inventory.192.168.49.2.nip.io
+
