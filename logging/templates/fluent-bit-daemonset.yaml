@@ -1,0 +1,74 @@
+{{- if .Values.fluentBit.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Values.fluentBit.name }}
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "fluentBit.selectorLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "fluentBit.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "logging.labels" . | nindent 8 }}
+        {{- include "fluentBit.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/fluent-bit-configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Values.fluentBit.serviceAccount.name }}
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: fluent-bit
+          image: "{{ .Values.fluentBit.image.repository }}:{{ .Values.fluentBit.image.tag }}"
+          imagePullPolicy: {{ .Values.fluentBit.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 2020
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.fluentBit.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /fluent-bit/etc/fluent-bit.conf
+              subPath: fluent-bit.conf
+            # /var/log/containers holds symlinks into /var/log/pods, so the
+            # whole tree has to be mounted for the tail input to resolve them.
+            - name: varlog
+              mountPath: /var/log
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.fluentBit.name }}
+        - name: varlog
+          hostPath:
+            path: /var/log
+            type: Directory
+        - name: positions
+          hostPath:
+            path: /var/log/fluent-bit
+            type: DirectoryOrCreate
+      {{- with .Values.fluentBit.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fluentBit.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

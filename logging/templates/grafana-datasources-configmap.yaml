@@ -1,0 +1,23 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.grafana.name }}-datasources
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "grafana.selectorLabels" . | nindent 4 }}
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        uid: loki
+        url: {{ include "loki.url" . }}
+        isDefault: true
+        editable: false
+        jsonData:
+          maxLines: 1000
+{{- end }}

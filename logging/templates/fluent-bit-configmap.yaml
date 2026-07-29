@@ -1,0 +1,64 @@
+{{- if .Values.fluentBit.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.fluentBit.name }}
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "fluentBit.selectorLabels" . | nindent 4 }}
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Daemon           Off
+        Flush            1
+        Log_Level        {{ .Values.fluentBit.logLevel }}
+        Parsers_File     parsers.conf
+        HTTP_Server      On
+        HTTP_Listen      0.0.0.0
+        HTTP_Port        2020
+        Health_Check     On
+
+    [INPUT]
+        Name             tail
+        Tag              kube.*
+        Path             /var/log/containers/*.log
+        # EKS nodes run containerd, so log lines arrive in CRI format.
+        multiline.parser cri
+        # Offsets survive a pod restart, so logs are not re-shipped.
+        DB               /var/log/flb_kube.db
+        Mem_Buf_Limit    5MB
+        Skip_Long_Lines  On
+        Refresh_Interval 10
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude On
+        Labels              Off
+        Annotations         Off
+{{- if .Values.fluentBit.excludeNamespaces }}
+
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Exclude $kubernetes['namespace_name'] ^({{ join "|" .Values.fluentBit.excludeNamespaces }})$
+{{- end }}
+
+    [OUTPUT]
+        Name                   loki
+        Match                  kube.*
+        Host                   {{ .Values.loki.name }}.{{ include "logging.namespace" . }}.svc.cluster.local
+        Port                   {{ .Values.loki.service.httpPort }}
+        # Every label here becomes a Loki stream dimension - keep the set small.
+        Labels                 job=fluent-bit, namespace=$kubernetes['namespace_name'], node=$kubernetes['host']
+        Auto_Kubernetes_Labels Off
+        Remove_Keys            kubernetes, stream, _p
+        Line_Format            json
+        Retry_Limit            5
+{{- end }}

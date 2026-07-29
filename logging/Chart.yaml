@@ -1,0 +1,9 @@
+apiVersion: v2
+name: logging
+description: Fluent Bit, Loki and Grafana logging stack for the stockwatch EKS cluster
+
+type: application
+
+version: 0.1.0
+
+appVersion: "3.5.1"

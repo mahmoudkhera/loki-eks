@@ -1,0 +1,33 @@
+{{- if and .Values.grafana.enabled .Values.grafana.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.grafana.ingress.name }}
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "grafana.selectorLabels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.grafana.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.grafana.ingress.groupName }}
+    alb.ingress.kubernetes.io/group.name: {{ . }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.grafana.ingress.className }}
+  rules:
+    -
+      {{- if .Values.grafana.ingress.host }}
+      host: {{ .Values.grafana.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: {{ .Values.grafana.ingress.path }}
+            pathType: {{ .Values.grafana.ingress.pathType }}
+            backend:
+              service:
+                name: {{ .Values.grafana.name }}
+                port:
+                  name: http
+{{- end }}

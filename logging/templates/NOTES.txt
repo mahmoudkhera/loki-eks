@@ -1,0 +1,36 @@
+{{ .Chart.Name }} installed into namespace {{ include "logging.namespace" . }}.
+
+Watch the stack come up:
+
+  kubectl -n {{ include "logging.namespace" . }} get pods -w
+
+{{ if .Values.loki.enabled -}}
+Loki is at {{ include "loki.url" . }}
+  storage:   {{ .Values.loki.storage.type }}{{ if eq .Values.loki.storage.type "s3" }} (bucket {{ .Values.loki.storage.s3.bucketName }}){{ end }}
+  retention: {{ .Values.loki.retentionPeriod }}
+{{- if and (eq .Values.loki.storage.type "s3") (not .Values.loki.serviceAccount.roleArn) }}
+
+  WARNING: storage.type is s3 but no IRSA role is set on the service account.
+  Loki will fail to write chunks. Set it with:
+
+    helm upgrade {{ .Release.Name }} . --reuse-values \
+      --set loki.serviceAccount.roleArn=$(terraform -chdir=../infra output -raw loki_irsa_role_arn)
+{{- end }}
+{{ end }}
+{{- if .Values.grafana.enabled }}
+Reach Grafana:
+
+  kubectl -n {{ include "logging.namespace" . }} port-forward svc/{{ .Values.grafana.name }} 3000:{{ .Values.grafana.service.port }}
+  open http://localhost:3000
+
+  user:     {{ .Values.grafana.adminUser }}
+{{- if .Values.grafana.existingSecret }}
+  password: from secret {{ .Values.grafana.existingSecret }}
+{{- else }}
+  password: kubectl -n {{ include "logging.namespace" . }} get secret {{ include "grafana.secretName" . }} -o jsonpath='{.data.admin-password}' | base64 -d
+{{- end }}
+
+The Loki datasource is provisioned already. Try this query in Explore:
+
+  {namespace="stock"}
+{{- end }}

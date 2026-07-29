@@ -1,0 +1,47 @@
+{{- if .Values.loki.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.loki.name }}
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "loki.selectorLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.loki.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.loki.service.httpPort }}
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: {{ .Values.loki.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    {{- include "loki.selectorLabels" . | nindent 4 }}
+---
+# Stable network identity for the StatefulSet pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.loki.name }}-headless
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "loki.selectorLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: {{ .Values.loki.service.httpPort }}
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: {{ .Values.loki.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    {{- include "loki.selectorLabels" . | nindent 4 }}
+{{- end }}

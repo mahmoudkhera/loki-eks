@@ -6,6 +6,7 @@ defensible monthly bill rather than for production hardening.
 ## Quick start
 
 ```bash
+cd infra
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars - at minimum set public_access_cidrs to your own IP
 
@@ -16,6 +17,8 @@ terraform apply
 aws eks update-kubeconfig --region us-east-1 --name stockwatch
 kubectl get nodes
 ```
+
+The Terraform configuration now lives in the infra directory. It also creates an S3 bucket and an IAM role for the Loki service account via IRSA when enable_loki_bucket is true.
 
 Apply takes roughly 12-15 minutes; the control plane alone is about 9 of those.
 

@@ -178,3 +178,31 @@ variable "public_access_cidrs" {
   type        = bool
   default     = true
 }
+
+# ---------------------------------------------------------------------------
+# Loki object storage (IRSA)
+# ---------------------------------------------------------------------------
+
+variable "enable_loki_bucket" {
+  description = "Create an S3 bucket and IAM role for Loki to use via IRSA."
+  type        = bool
+  default     = true
+}
+
+variable "loki_bucket_name" {
+  description = "Optional override for the Loki S3 bucket name. Leave null to auto-generate one."
+  type        = string
+  default     = null
+}
+
+variable "loki_namespace" {
+  description = "Kubernetes namespace that hosts the Loki service account."
+  type        = string
+  default     = "monitoring"
+}
+
+variable "loki_service_account_name" {
+  description = "Service account name for the Loki pod to assume the S3 role."
+  type        = string
+  default     = "loki"
+}

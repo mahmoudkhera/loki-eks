@@ -1,0 +1,84 @@
+{{- if .Values.loki.enabled }}
+{{- if and (eq .Values.loki.storage.type "s3") (not .Values.loki.storage.s3.bucketName) }}
+{{- fail "loki.storage.s3.bucketName is required when loki.storage.type is s3 - use the loki_bucket_name terraform output, or set loki.storage.type=filesystem for a throwaway install" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.loki.name }}
+  namespace: {{ include "logging.namespace" . }}
+  labels:
+    {{- include "logging.labels" . | nindent 4 }}
+    {{- include "loki.selectorLabels" . | nindent 4 }}
+data:
+  loki.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: {{ .Values.loki.service.httpPort }}
+      grpc_listen_port: {{ .Values.loki.service.grpcPort }}
+      log_level: info
+
+    common:
+      path_prefix: /var/loki
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+      storage:
+      {{- if eq .Values.loki.storage.type "s3" }}
+        s3:
+          bucketnames: {{ .Values.loki.storage.s3.bucketName }}
+          region: {{ .Values.loki.storage.s3.region }}
+          {{- if .Values.loki.storage.s3.endpoint }}
+          endpoint: {{ .Values.loki.storage.s3.endpoint }}
+          {{- end }}
+          s3forcepathstyle: {{ .Values.loki.storage.s3.forcePathStyle }}
+      {{- else }}
+        filesystem:
+          chunks_directory: /var/loki/chunks
+          rules_directory: /var/loki/rules
+      {{- end }}
+
+    schema_config:
+      configs:
+        - from: 2024-04-01
+          store: tsdb
+          object_store: {{ include "loki.objectStore" . }}
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      tsdb_shipper:
+        active_index_directory: /var/loki/tsdb-index
+        cache_location: /var/loki/tsdb-cache
+
+    compactor:
+      working_directory: /var/loki/compactor
+      retention_enabled: true
+      delete_request_store: {{ include "loki.objectStore" . }}
+
+    limits_config:
+      retention_period: {{ .Values.loki.retentionPeriod }}
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      max_cache_freshness_per_query: 10m
+      ingestion_rate_mb: {{ .Values.loki.limits.ingestionRateMB }}
+      ingestion_burst_size_mb: {{ .Values.loki.limits.ingestionBurstSizeMB }}
+      per_stream_rate_limit: {{ .Values.loki.limits.perStreamRateLimit }}
+      per_stream_rate_limit_burst: {{ .Values.loki.limits.perStreamRateLimitBurst }}
+      max_query_series: {{ .Values.loki.limits.maxQuerySeries }}
+      volume_enabled: true
+      allow_structured_metadata: true
+
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /var/loki/rules
+
+    analytics:
+      reporting_enabled: false
+{{- end }}

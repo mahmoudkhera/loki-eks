@@ -24,6 +24,11 @@ node_disk_size     = 20
 enable_ebs_csi_driver  = false  # needed for PersistentVolumeClaims
 enable_cluster_logging = false  # CloudWatch ingestion is ~$0.50/GB
 
+# Loki object storage via IRSA
+enable_loki_bucket      = true
+loki_bucket_name        = null      # optional override; leave null for an auto-generated name
+loki_namespace          = "monitoring"
+loki_service_account_name = "loki"
 
 # ---- Production-shaped alternative (uncomment, roughly +$40/mo) ----------
 # enable_nat_gateway = true
@@ -31,3 +36,26 @@ enable_cluster_logging = false  # CloudWatch ingestion is ~$0.50/GB
 # capacity_type      = "ON_DEMAND"
 # node_min_size      = 2
 # node_desired_size  = 3
+
+
+
+
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/A1B2C3D4E5F6"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.eks.us-east-1.amazonaws.com/id/A1B2C3D4E5F6:sub": "system:serviceaccount:logging:loki",
+          "oidc.eks.us-east-1.amazonaws.com/id/A1B2C3D4E5F6:aud": "sts.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+namespace:
+  create: true
+  name: monitoring
+
+loki:
+  enabled: true
+  name: loki
+  image:
+    repository: grafana/loki
+    tag: "3.5.1"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  serviceAccount:
+    create: true
+    name: loki
+    # Set to the loki_irsa_role_arn output from terraform when storage.type is s3.
+    roleArn: ""
+    annotations: {}
+  service:
+    type: ClusterIP
+    httpPort: 3100
+    grpcPort: 9096
+  # s3 matches the infra defaults (enable_loki_bucket = true).
+  # Use filesystem only for a throwaway install - the data dies with the pod.
+  storage:
+    type: s3
+    s3:
+      # terraform output loki_bucket_name
+      bucketName: ""
+      region: us-east-1
+      # Leave empty for real S3. Set for MinIO or another S3-compatible endpoint.
+      endpoint: ""
+      forcePathStyle: false
+      # Only for non-IRSA setups such as MinIO. Prefer IRSA on EKS.
+      accessKeyId: ""
+      secretAccessKey: ""
+  # The EBS CSI driver is off by default in infra, so a PVC would stay Pending.
+  # Turn this on only after enable_ebs_csi_driver = true.
+  persistence:
+    enabled: false
+    size: 10Gi
+    storageClass: ""
+  retentionPeriod: 168h
+  # Ingest limits. The defaults suit a two-node cluster.
+  limits:
+    ingestionRateMB: 8
+    ingestionBurstSizeMB: 16
+    maxQuerySeries: 500
+    perStreamRateLimit: 5MB
+    perStreamRateLimitBurst: 20MB
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+
+fluentBit:
+  enabled: true
+  name: fluent-bit
+  image:
+    repository: fluent/fluent-bit
+    tag: "3.2.10"
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: true
+    name: fluent-bit
+  rbac:
+    create: true
+  # Namespaces whose logs are dropped before they reach Loki.
+  excludeNamespaces:
+    - kube-system
+  logLevel: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+
+grafana:
+  enabled: true
+  name: grafana
+  image:
+    repository: grafana/grafana
+    tag: "11.6.1"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  adminUser: admin
+  # Change this before installing, or pass --set grafana.adminPassword=...
+  adminPassword: admin
+  # Reference a secret you created yourself instead of the chart-managed one.
+  existingSecret: ""
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+  # Grafana serves from / by default. Set rootUrl if you put it behind a path.
+  rootUrl: ""
+  ingress:
+    enabled: false
+    name: grafana-ingress
+    className: alb
+    # Leave empty to serve on the ALB's own DNS name with no host rule.
+    host: ""
+    path: /
+    pathType: Prefix
+    # Reuse the stockwatch ALB instead of paying for a second one. Must match
+    # the group.name on the other chart's ingress.
+    groupName: stockwatch
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+      alb.ingress.kubernetes.io/healthcheck-path: /api/health
+  persistence:
+    enabled: false
+    size: 5Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
