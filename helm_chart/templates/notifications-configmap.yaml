@@ -1,0 +1,14 @@
+{{- if and .Values.notifications.enabled .Values.notifications.config }}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ .Values.notifications.name }}-config
+  namespace: {{ include "stockwatch.namespace" . }}
+  labels:
+    {{- include "stockwatch.labels" . | nindent 4 }}
+    {{- include "notifications.selectorLabels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.notifications.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

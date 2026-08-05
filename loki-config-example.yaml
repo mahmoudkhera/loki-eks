@@ -1,0 +1,175 @@
+---
+# Source: logging/templates/loki-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: logging
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: logging-0.1.0
+    app: loki
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: logging
+data:
+  loki.yaml: |
+    auth_enabled: false
+  #Badly named — it has nothing to do with authentication. It controls multi-tenancy.
+
+      # false → no X-Scope-OrgID header required; everything lands in one hardcoded tenant called fake
+      # true → every push and query must carry that header, and data is partitioned by its value
+    server:
+      http_listen_port: 3100
+    #  the REST API. Everything you've been using goes here:
+
+      # POST /loki/api/v1/push — Fluent Bit's output
+      # GET /loki/api/v1/query_range — Grafana queries
+      
+      grpc_listen_port: 9096
+      # inter-component communication. In monolithic mode the distributor, ingester, and querier run in one process and call each other in memory, so this port is barely used. It still has to bind
+      log_level: info
+
+      #things you must be carful with 
+        # http_server_read_timeout: 60s
+        # http_server_write_timeout: 60s
+        # grpc_server_max_recv_msg_size: 8388608
+        # grpc_server_max_send_msg_size: 8388608
+
+    common:
+
+      path_prefix: /var/loki
+      # Base directory for every relative path Loki resolves. If you don't override a subdirectory explicitly, it's derived from here — WAL at /var/loki/wal, the compactor's scratch, the shipper's staging.
+      #Must match your StatefulSet's volumeMounts path. If they disagree, Loki writes to the container's root filesystem instead of the mounted volume — works until the pod restarts, then everything's gone with no obvious cause. This is the silent one
+      
+      replication_factor: 1
+      # How many ingesters receive each stream. With one, there's a single copy: an ingester restart
+      # loses whatever is in the WAL and not yet flushed to a chunk. With 3, Loki uses quorum —
+      # writes succeed once 2 acknowledge, queries deduplicate, and you survive losing one ingester.
+      # RF must be ≤ the number of ingesters
+      #
+      
+
+
+      ring:
+        kvstore:
+          store: inmemory
+
+      # Where the hash ring lives — the registry of which ingesters exist and which token ranges each owns
+      # inmemory means the ring exists only inside this process. It only works with exactly one replica,
+      # The alternatives are memberlist (gossip between Loki pods, no external dependency) and consul/etcd
+      #
+      #
+
+      storage:
+        s3:
+          bucketnames: bucketname
+          region: us-east-1
+          s3forcepathstyle: false
+          #s3forcepathstyle: false gives virtual-hosted style (bucket.s3.region.amazonaws.com), correct for AWS. true is for MinIO, which needs the bucket as a path segment.
+
+    schema_config:
+      configs:
+      #It's a list of time-bounded schema periods, not a single setting. Each entry says "from this date onward, data is written in this format."
+
+        - from: 2024-04-01
+        # When this schema becomes effective. Three rules:
+
+          # Must be in the past, or Loki refuses to start — there'd be a period with no schema defined.
+          # Must be day-aligned (midnight UTC). Not a timestamp.
+          # Applies to log timestamps, not wall-clock. A line with a timestamp before this date has no schema and gets rejected.
+          
+          store: tsdb
+          # The index format — how Loki stores the mapping from label sets to chunk locations.
+          object_store: s3
+          # Where chunks go. Distinct from store, which is about the index.
+         # Must match what's defined in common.storage. If common.storage has an s3: block, this says s3. If it has filesystem:, this says filesystem.
+          schema: v13
+          # The key encoding — how label sets are hashed and how chunk keys are constructed.
+          index:
+            prefix: index_
+            # prefix is the filename/key prefix for index files:
+            period: 24h
+            # period is the rotation interval — a new index file per period. For tsdb this must be exactly 24h. Other values are rejected
+
+    storage_config:
+      tsdb_shipper:
+      # The shipper is the piece that moves index files between local disk and object storage. It exists because TSDB index files can't be written directly to S3
+      # object storage has no partial writes, and TSDB is a mutable structure while it's being built.
+      # So the flow is: build locally, ship when complete, download when querying.
+        active_index_directory: /var/loki/tsdb-index
+        # Where the currently-being-written index file lives.
+        # As logs arrive, the ingester appends label-set entries to a local TSDB index. It's mutable and open for writes. Every 15 minutes (default resync_interval)
+
+        cache_location: /var/loki/tsdb-cache
+        # Where downloaded index files are cached for querying.
+        # When a query covers a time range, Loki needs the index files for those days. They're in S3, so the querier downloads them here and reads locally
+
+
+    compactor:
+    # The compactor does two jobs. One is housekeeping; the other is the only thing that actually deletes your data.
+
+    # Job 1 — index compaction
+    # The shipper uploads a fresh index file every 15 minutes (resync_interval), so a single 24h
+    # period ends up with ~96 small files, all covering the same day. A query over that day has to open all of them
+    # The compactor merges them into one file per period. Fewer objects in S3, fewer GETs per query, faster lookups.
+
+    # Job 2 — retention enforcement
+
+      working_directory: /var/loki/compactor
+      retention_enabled: true
+      # This is the line that makes retention_period mean anything. Without it,
+      # retention_period: 168h in limits_config is a decorative string — the compactor still
+      # merges indexes but never deletes chunks, and your bucket grows forever.
+
+      delete_request_store: s3
+      # Required in Loki 3.x whenever retention_enabled: true. It's where delete requests are persisted — the queue of "these objects should go" that survives a compactor restart mid-cycle.
+      # mUST MATCH OBJECT_STORE IN YOUR SCHEMA CONFIG. oN FILESYSTEM STORAGE IT'S FILESYSTEM.
+
+
+    limits_config:
+      retention_period: 168h
+      # Seven days. Enforced by the compactor, not here — this is just the value it reads. Without retention_enabled: true in the compactor block, it does nothing.
+
+      reject_old_samples: true
+      # Rejects log lines whose timestamp is older than the cutoff, with a 400 to Fluent Bit.
+
+      reject_old_samples_max_age: 168h
+      # The point is protecting the index. Loki assumes roughly time-ordered writes;
+      # a misconfigured agent replaying a month of archived logs would create index entries scattered across dozens of old periods
+
+      # One consequence to be aware of: a node with badly skewed clock, or a container that buffers
+      # logs across a long outage, will have its lines rejected. You'd see 400s in Fluent Bit's logs rather than 429s.
+
+      max_cache_freshness_per_query: 10m
+      # Prevents caching query results for the most recent 10 minutes.
+      # Recent chunks are still being written and new lines keep arriving. A cached result from 30 seconds ago could be missing data that has since landed — so Grafana's live tail would show stale results.
+      # n monolithic mode with no query-frontend cache configured, this is currently inert. Harmless and correct to keep for when you add one.
+
+      ingestion_rate_mb: 8
+      ingestion_burst_size_mb: 16
+      # Per-tenant throughput cap: 8 MB/s sustained, with a 16 MB token bucket for bursts. Exceeding it returns 429.
+
+      per_stream_rate_limit: 5MB
+      per_stream_rate_limit_burst: 20MB
+      # This is the limit you'd actually hit, and the reason it matters is your label design.
+      # A stream is one unique label combination. With namespace, app, and host, all of one
+      # service's logs on one node are a single stream. So one chatty service can hit 5 MB/s per-stream
+      # while the tenant total sits far below 8 MB/s.
+      max_query_series: 500
+      # Caps how many distinct streams a single query may touch. Exceed it and the query errors rather than running.
+      
+      volume_enabled: true
+      # Enables /loki/api/v1/index/volume and /volume_range, which report bytes ingested per label combination without scanning chunks
+      # Powers Grafana's log volume histogram — the bar chart above your query results in Explore
+      allow_structured_metadata: true
+      # This enables a third place to put data, alongside labels and the log body — and it's the answer to the pod-name problem we kept circling.
+
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /var/loki/rules
+
+    analytics:
+      reporting_enabled: false

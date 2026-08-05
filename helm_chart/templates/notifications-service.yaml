@@ -1,0 +1,27 @@
+{{- if .Values.notifications.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.notifications.name }}
+  namespace: {{ include "stockwatch.namespace" . }}
+  labels:
+    {{- include "stockwatch.labels" . | nindent 4 }}
+    {{- include "notifications.selectorLabels" . | nindent 4 }}
+  {{- with .Values.notifications.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.notifications.service.type | default "ClusterIP" }}
+  ports:
+    # Not exposed through the ingress - inventory calls it in-cluster.
+    - name: http
+      port: {{ .Values.notifications.service.port | default .Values.notifications.containerPort }}
+      targetPort: http
+      protocol: TCP
+      {{- if and .Values.notifications.service.nodePort (eq .Values.notifications.service.type "NodePort") }}
+      nodePort: {{ .Values.notifications.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "notifications.selectorLabels" . | nindent 4 }}
+{{- end }}

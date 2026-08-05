@@ -82,7 +82,9 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-  {{- if .Values.loki.persistence.enabled }}
+---
+
+{{- if .Values.loki.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: storage

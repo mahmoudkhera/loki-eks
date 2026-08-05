@@ -1,19 +1,27 @@
+{{- if .Values.frontend.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.frontend.serviceName }}
-  namespace: {{ .Values.namespace  }}
+  name: {{ .Values.frontend.name }}
+  namespace: {{ include "stockwatch.namespace" . }}
   labels:
-    app: {{ .Values.frontend.appName }}
-    tier: frontend
+    {{- include "stockwatch.labels" . | nindent 4 }}
+    {{- include "frontend.selectorLabels" . | nindent 4 }}
+  {{- with .Values.frontend.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.frontend.service.type | default "ClusterIP" }}
   ports:
-    - port: {{ .Values.frontend.service.port | default 80 }}
-      targetPort: {{ .Values.frontend.service.targetPort | default 80 }}
+    # The ingress references this port by name.
+    - name: http
+      port: {{ .Values.frontend.service.port | default .Values.frontend.containerPort }}
+      targetPort: http
       protocol: TCP
-      name: {{ .Values.frontend.service.port_name  }}
-     # nodePort: {{ .Values.frontend.service.nodePort }}  
+      {{- if and .Values.frontend.service.nodePort (eq .Values.frontend.service.type "NodePort") }}
+      nodePort: {{ .Values.frontend.service.nodePort }}
+      {{- end }}
   selector:
-    app: {{ .Values.frontend.appName }}
-    tier: frontend
+    {{- include "frontend.selectorLabels" . | nindent 4 }}
+{{- end }}

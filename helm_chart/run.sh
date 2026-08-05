@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
+# Install or upgrade the stockwatch release.
+# Usage: ./run.sh [extra helm args...]
 
-set -e
-set -u
+set -euo pipefail
 
-helm install  stock . \
-  -f values-frontend.yaml \
-  -f values-inventory.yaml \
-  -f values-notifactions.yaml \
-  -f values.yaml
+RELEASE="${RELEASE:-stock}"
+NAMESPACE="${NAMESPACE:-stock}"
+CHART_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+helm upgrade --install "$RELEASE" "$CHART_DIR" \
+  --namespace "$NAMESPACE" \
+  --create-namespace \
+  --wait \
+  --timeout 5m \
+  "$@"

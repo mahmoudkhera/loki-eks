@@ -1,26 +1,26 @@
-{{- if .Values.inventory.enabled }}
+{{- if .Values.notifications.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.inventory.name }}
+  name: {{ .Values.notifications.name }}
   namespace: {{ include "stockwatch.namespace" . }}
   labels:
     {{- include "stockwatch.labels" . | nindent 4 }}
-    {{- include "inventory.selectorLabels" . | nindent 4 }}
+    {{- include "notifications.selectorLabels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.inventory.replicas }}
+  replicas: {{ .Values.notifications.replicas }}
   selector:
     matchLabels:
-      {{- include "inventory.selectorLabels" . | nindent 6 }}
+      {{- include "notifications.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "stockwatch.labels" . | nindent 8 }}
-        {{- include "inventory.selectorLabels" . | nindent 8 }}
+        {{- include "notifications.selectorLabels" . | nindent 8 }}
       annotations:
         # Roll the pods when the ConfigMap changes - envFrom alone would not.
-        checksum/config: {{ include (print $.Template.BasePath "/inventory-configmap.yaml") . | sha256sum }}
-        {{- with .Values.inventory.podAnnotations }}
+        checksum/config: {{ include (print $.Template.BasePath "/notifications-configmap.yaml") . | sha256sum }}
+        {{- with .Values.notifications.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
@@ -33,47 +33,47 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: inventory
-          image: "{{ .Values.inventory.image.repository }}:{{ .Values.inventory.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ include "stockwatch.pullPolicy" (dict "svc" .Values.inventory "root" .) }}
+        - name: notifications
+          image: "{{ .Values.notifications.image.repository }}:{{ .Values.notifications.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ include "stockwatch.pullPolicy" (dict "svc" .Values.notifications "root" .) }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
             - name: http
-              containerPort: {{ .Values.inventory.containerPort }}
+              containerPort: {{ .Values.notifications.containerPort }}
               protocol: TCP
           envFrom:
-            {{- if .Values.inventory.config }}
+            {{- if .Values.notifications.config }}
             - configMapRef:
-                name: {{ .Values.inventory.name }}-config
+                name: {{ .Values.notifications.name }}-config
             {{- end }}
-            {{- if .Values.inventory.sealedSecret.enabled }}
+            {{- if .Values.notifications.sealedSecret.enabled }}
             - secretRef:
-                name: {{ .Values.inventory.sealedSecret.name }}
+                name: {{ .Values.notifications.sealedSecret.name }}
             {{- end }}
-          {{- with .Values.inventory.readinessProbe }}
+          {{- with .Values.notifications.readinessProbe }}
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.inventory.livenessProbe }}
+          {{- with .Values.notifications.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.inventory.resources }}
+          {{- with .Values.notifications.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- with .Values.inventory.nodeSelector }}
+      {{- with .Values.notifications.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.inventory.tolerations }}
+      {{- with .Values.notifications.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.inventory.affinity }}
+      {{- with .Values.notifications.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}

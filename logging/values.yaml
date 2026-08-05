@@ -23,17 +23,16 @@ loki:
   # s3 matches the infra defaults (enable_loki_bucket = true).
   # Use filesystem only for a throwaway install - the data dies with the pod.
   storage:
-    type: s3
+    type: filesystem
     s3:
       # terraform output loki_bucket_name
-      bucketName: ""
+      bucketName: "bucketname"
       region: us-east-1
-      # Leave empty for real S3. Set for MinIO or another S3-compatible endpoint.
-      endpoint: ""
+
       forcePathStyle: false
       # Only for non-IRSA setups such as MinIO. Prefer IRSA on EKS.
-      accessKeyId: ""
-      secretAccessKey: ""
+      accessKeyId: "accesKeyId "
+      secretAccessKey: "secretAccessKey"
   # The EBS CSI driver is off by default in infra, so a PVC would stay Pending.
   # Turn this on only after enable_ebs_csi_driver = true.
   persistence:
@@ -73,7 +72,7 @@ fluentBit:
   # Namespaces whose logs are dropped before they reach Loki.
   excludeNamespaces:
     - kube-system
-  logLevel: info
+  logLevel: debug
   resources:
     requests:
       cpu: 50m
@@ -103,23 +102,32 @@ grafana:
     port: 80
     targetPort: 3000
   # Grafana serves from / by default. Set rootUrl if you put it behind a path.
-  rootUrl: ""
+  rootUrl: "http://192.168.49.2/grafana/"
   ingress:
-    enabled: false
+    enabled: true
     name: grafana-ingress
-    className: alb
+    
+    className: nginx
     # Leave empty to serve on the ALB's own DNS name with no host rule.
     host: ""
-    path: /
+    # path: /grafan(/|$)(.*)
+    path: /grafana
     pathType: Prefix
+    # pathType:  ImplementationSpecific
     # Reuse the stockwatch ALB instead of paying for a second one. Must match
     # the group.name on the other chart's ingress.
-    groupName: stockwatch
+    # groupName: stockwatch
     annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-      alb.ingress.kubernetes.io/healthcheck-path: /api/health
+      # alb.ingress.kubernetes.io/scheme: internet-facing
+      # alb.ingress.kubernetes.io/target-type: ip
+      # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+      # alb.ingress.kubernetes.io/healthcheck-path: /api/health
+      # nginx.ingress.kubernetes.io/use-regex: "true"
+      # nginx.ingress.kubernetes.io/rewrite-target: /$2
+
+
+
+      
   persistence:
     enabled: false
     size: 5Gi

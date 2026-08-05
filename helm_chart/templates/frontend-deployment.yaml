@@ -1,34 +1,76 @@
+{{- if .Values.frontend.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.frontend.appName }}
-  namespace: {{ .Values.namespace }}
+  name: {{ .Values.frontend.name }}
+  namespace: {{ include "stockwatch.namespace" . }}
   labels:
-    app: {{ .Values.frontend.appName}}
+    {{- include "stockwatch.labels" . | nindent 4 }}
+    {{- include "frontend.selectorLabels" . | nindent 4 }}
 spec:
-  replicas: 3
+  replicas: {{ .Values.frontend.replicas }}
   selector:
     matchLabels:
-      app: {{ .Values.frontend.appName}}
-      tier: frontend
+      {{- include "frontend.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ .Values.frontend.appName}}
-        tier: frontend
-    spec: 
+        {{- include "stockwatch.labels" . | nindent 8 }}
+        {{- include "frontend.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll the pods when the ConfigMap changes - envFrom alone would not.
+        checksum/config: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
+        {{- with .Values.frontend.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
-      - name: frontend
-        image: "{{ .Values.frontend.image_name }}:{{ .Values.frontend.image_tag }}"
-        ports:
-        - containerPort: {{.Values.frontend.containerPort}}
-        envFrom:
-        - configMapRef:
-            name: {{ .Values.frontend.configmap.name }}
-        resources:
-          requests:
-            memory: "16Mi" 
-            cpu: "50m"    
-          limits:
-            memory: "128Mi"  
-            cpu: "100m"
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ include "stockwatch.pullPolicy" (dict "svc" .Values.frontend "root" .) }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+              protocol: TCP
+          {{- if .Values.frontend.config }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.frontend.name }}-config
+          {{- end }}
+          {{- with .Values.frontend.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.frontend.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.frontend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

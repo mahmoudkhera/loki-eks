@@ -1,9 +1,25 @@
 apiVersion: v2
-name: helm_chart
-description: A Helm chart for Kubernetes
+name: stockwatch
+description: Frontend, inventory and notification services for the stockwatch app
 
 type: application
 
+# Chart version - bump on every change to the chart itself.
 version: 0.1.0
 
-appVersion: "1.16.0"
+# Version of the application this chart deploys.
+appVersion: "1.0.0"
+
+kubeVersion: ">=1.23.0-0"
+
+keywords:
+  - stockwatch
+  - microservices
+
+home: https://gitlab.com/mahmoudkhera20/microservice-devops
+
+
+apiVersion: v2
+name: app
+description: A Helm chart for Kubernetes
+

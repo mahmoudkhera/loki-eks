@@ -56,6 +56,8 @@ spec:
               value: "false"
             - name: GF_USERS_ALLOW_SIGN_UP
               value: "false"
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "true"
           readinessProbe:
             httpGet:
               path: /api/health
@@ -96,8 +98,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-{{- if .Values.grafana.persistence.enabled }}
 ---
+
+{{- if .Values.grafana.persistence.enabled }}
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

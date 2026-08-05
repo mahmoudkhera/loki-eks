@@ -1,9 +1,13 @@
-kind: ConfigMap 
-apiVersion: v1 
+{{- if and .Values.frontend.enabled .Values.frontend.config }}
+kind: ConfigMap
+apiVersion: v1
 metadata:
-  name: {{ .Values.frontend.configmap.name }}
-  namespace: {{ .Values.namespace }}
+  name: {{ .Values.frontend.name }}-config
+  namespace: {{ include "stockwatch.namespace" . }}
+  labels:
+    {{- include "stockwatch.labels" . | nindent 4 }}
 data:
-  FRONTEND_PORT: {{ .Values.frontend.configmap.data.PORT | quote}}
-  FRONTEND_HOST: {{ .Values.frontend.configmap.data.HOST | quote}}
-  API: {{ .Values.frontend.configmap.data.API }}
+  {{- range $key, $value := .Values.frontend.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

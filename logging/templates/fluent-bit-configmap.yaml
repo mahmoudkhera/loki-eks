@@ -23,8 +23,7 @@ data:
         Name             tail
         Tag              kube.*
         Path             /var/log/containers/*.log
-        # EKS nodes run containerd, so log lines arrive in CRI format.
-        multiline.parser cri
+        multiline.parser docker,cri
         # Offsets survive a pod restart, so logs are not re-shipped.
         DB               /var/log/flb_kube.db
         Mem_Buf_Limit    5MB
@@ -57,9 +56,20 @@ data:
         Host                   {{ .Values.loki.name }}.{{ include "logging.namespace" . }}.svc.cluster.local
         Port                   {{ .Values.loki.service.httpPort }}
         # Every label here becomes a Loki stream dimension - keep the set small.
-        Labels                 job=fluent-bit, namespace=$kubernetes['namespace_name'], node=$kubernetes['host']
+        Labels                 job=fluent-bit, namespace=$kubernetes['namespace_name'], node=$kubernetes['host'] ,app=$kubernetes['labels']['app']
         Auto_Kubernetes_Labels Off
         Remove_Keys            kubernetes, stream, _p
         Line_Format            json
         Retry_Limit            5
 {{- end }}
+
+
+
+
+  parsers.conf: |
+    [PARSER]
+        Name        json_app
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%LZ
+        Time_Keep   Off

@@ -1,33 +1,46 @@
+{{- if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.ingress.name }}
-  namespace: {{ .Values.namespace }}
+  name: {{ .Values.ingress.name | default (include "stockwatch.fullname" .) }}
+  namespace: {{ include "stockwatch.namespace" . }}
   labels:
-    app: {{ .Values.appName }}
+    {{- include "stockwatch.labels" . | nindent 4 }}
   annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/group.name: {{ .Values.appName }}
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.ingress.groupName }}
+    alb.ingress.kubernetes.io/group.name: {{ . }}
+    {{- end }}
 spec:
-  ingressClassName: alb
+  ingressClassName: {{ .Values.ingress.className }}
   rules:
-    - http:
+    -
+      {{- with .Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}
+      http:
         paths:
-          - path: /backend
-            pathType: Prefix
+          {{- if .Values.inventory.enabled }}
+          - path: {{ .Values.ingress.backendPath }}
+            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ .Values.inventory.serviceName }}
+                name: {{ .Values.inventory.name }}
                 port:
-                  name: {{ .Values.inventory.service.port_name }}
-
-          - path: /
-            pathType: Prefix
+                  name: http
+          {{- end }}
+          {{- if .Values.frontend.enabled }}
+          - path: {{ .Values.ingress.frontendPath }}
+            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ .Values.frontend.serviceName }}
+                name: {{ .Values.frontend.name }}
                 port:
-                  name: {{ .Values.frontend.service.port_name }}
+                  name: http
+          {{- end }}
+          {{- if not (or .Values.frontend.enabled .Values.inventory.enabled) }}
+          {{- fail "ingress.enabled is true but neither frontend nor inventory is enabled" }}
+          {{- end }}
+{{- end }}

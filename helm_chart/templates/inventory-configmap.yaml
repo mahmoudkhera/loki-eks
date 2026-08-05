@@ -1,11 +1,14 @@
-kind: ConfigMap 
-apiVersion: v1 
+{{- if and .Values.inventory.enabled .Values.inventory.config }}
+kind: ConfigMap
+apiVersion: v1
 metadata:
-  name: {{ .Values.inventory.configmap.name }}
-  namespace: {{ .Values.namespace }}
+  name: {{ .Values.inventory.name }}-config
+  namespace: {{ include "stockwatch.namespace" . }}
+  labels:
+    {{- include "stockwatch.labels" . | nindent 4 }}
+    {{- include "inventory.selectorLabels" . | nindent 4 }}
 data:
-  PORT: {{ .Values.inventory.configmap.data.PORT | quote}}                  
-  HOST: {{ .Values.inventory.configmap.data.HOST | quote}} 
-  CORS_ORIGIN: {{ .Values.inventory.configmap.data.CORS_ORIGIN  |   quote}} 
-  ALERT_RECIPIENT: {{ .Values.inventory.configmap.data.ALERT_RECIPIENT }} 
-  NOTIFICATION_URL: {{ .Values.inventory.configmap.data.NOTIFICATION_URL }} 
+  {{- range $key, $value := .Values.inventory.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}
