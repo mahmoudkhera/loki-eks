@@ -31,8 +31,8 @@ loki:
 
       forcePathStyle: false
       # Only for non-IRSA setups such as MinIO. Prefer IRSA on EKS.
-      accessKeyId: "accesKeyId "
-      secretAccessKey: "secretAccessKey"
+      accessKeyId: ""
+      secretAccessKey: ""
   # The EBS CSI driver is off by default in infra, so a PVC would stay Pending.
   # Turn this on only after enable_ebs_csi_driver = true.
   persistence:
