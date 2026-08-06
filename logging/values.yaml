@@ -107,7 +107,7 @@ grafana:
     enabled: true
     name: grafana-ingress
     
-    className: alb.ingress.kubernetes.io/healthcheck-path:
+    className: alb
     # Leave empty to serve on the ALB's own DNS name with no host rule.
     host: ""
     # path: /grafan(/|$)(.*)

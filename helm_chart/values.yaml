@@ -177,7 +177,7 @@ notifications:
 ingress:
   enabled: true
   name: app-ingress
-  className: alb.ingress.kubernetes.io/healthcheck-path:
+  className: alb
   # Leave empty to serve on the ALB's own DNS name with no host rule.
   host: ""
   # Share one ALB with the grafana ingress in the logging chart.

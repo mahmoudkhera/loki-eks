@@ -46,6 +46,12 @@ output "cost_notes" {
   }
 }
 
+
+
+output "lb_controller_role_arn" {
+  description = "IAM role ARN for the AWS Load Balancer Controller service account"
+  value       = try(module.lb_controller_irsa[0].iam_role_arn, null)
+}
 output "loki_bucket_name" {
   description = "Name of the S3 bucket created for Loki object storage."
   value       = var.enable_loki_bucket ? aws_s3_bucket.loki_logs[0].bucket : null
