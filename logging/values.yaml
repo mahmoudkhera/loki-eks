@@ -69,6 +69,8 @@ fluentBit:
     name: fluent-bit
   rbac:
     create: true
+  dockerRuntime:
+    enabled: false
   # Namespaces whose logs are dropped before they reach Loki.
   excludeNamespaces:
     - kube-system
@@ -102,29 +104,32 @@ grafana:
     port: 80
     targetPort: 3000
   # Grafana serves from / by default. Set rootUrl if you put it behind a path.
-  rootUrl: "http://192.168.49.2/grafana/"
+  rootUrl: ""
   ingress:
     enabled: true
     name: grafana-ingress
-    
-    className: alb
-    # Leave empty to serve on the ALB's own DNS name with no host rule.
+    controller: alb
     host: ""
-    # path: /grafan(/|$)(.*)
     path: /grafana
     pathType: Prefix
-    # pathType:  ImplementationSpecific
-    # Reuse the stockwatch ALB instead of paying for a second one. Must match
-    # the group.name on the other chart's ingress.
-    groupName: stockwatch
-    annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-      alb.ingress.kubernetes.io/healthcheck-path: /api/health
-      # nginx.ingress.kubernetes.io/use-regex: "true"
-      # nginx.ingress.kubernetes.io/rewrite-target: /$2
+  
+    alb:
+      className: alb
+      pathType: Prefix
+      groupName: stockwatch
+      scheme: internet-facing
+      targetType: ip
+      listenPorts: '[{"HTTP":80}]'
+      healthcheckPath: /healthz
+      extraAnnotations: {}
 
+    nginx:
+      className: nginx
+      pathType: Prefix
+      rewriteTarget: ""
+      sslRedirect: "false"
+      useRegex: "false"
+      extraAnnotations: {}
 
 
       

@@ -1,30 +1,47 @@
 {{- if .Values.ingress.enabled }}
+{{- $ing := .Values.ingress }}
+{{- if not (has $ing.controller (list "alb" "nginx")) }}
+{{- fail (printf "ingress.controller must be \"alb\" or \"nginx\", got %q" $ing.controller) }}
+{{- end }}
+{{- if not (or .Values.frontend.enabled .Values.inventory.enabled) }}
+{{- fail "ingress.enabled is true but neither frontend nor inventory is enabled" }}
+{{- end }}
+{{- $cfg := index $ing $ing.controller }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.ingress.name | default (include "stockwatch.fullname" .) }}
+  name: {{ $ing.name | default (include "stockwatch.fullname" .) }}
   namespace: {{ include "stockwatch.namespace" . }}
   labels:
+    name: .Values.ingress.name
     {{- include "stockwatch.labels" . | nindent 4 }}
   annotations:
-    {{- with .Values.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-    {{- with .Values.ingress.groupName }}
+  {{- if eq $ing.controller "alb" }}
+    alb.ingress.kubernetes.io/scheme: {{ $cfg.scheme }}
+    alb.ingress.kubernetes.io/target-type: {{ $cfg.targetType }}
+    alb.ingress.kubernetes.io/listen-ports: {{ $cfg.listenPorts | quote }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $cfg.healthcheckPath }}
+    {{- with $cfg.groupName }}
     alb.ingress.kubernetes.io/group.name: {{ . }}
     {{- end }}
+  {{- else if eq $ing.controller "nginx" }}
+    nginx.ingress.kubernetes.io/ssl-redirect: {{ $cfg.sslRedirect | quote }}
+    nginx.ingress.kubernetes.io/use-regex: {{ $cfg.useRegex | quote }}
+    {{- with $cfg.rewriteTarget }}
+    nginx.ingress.kubernetes.io/rewrite-target: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- with $cfg.extraAnnotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
+  ingressClassName: {{ $cfg.className }}
   rules:
-    -
-      {{- with .Values.ingress.host }}
-      host: {{ . | quote }}
-      {{- end }}
-      http:
+    - http:
         paths:
           {{- if .Values.inventory.enabled }}
-          - path: {{ .Values.ingress.backendPath }}
-            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+          - path: {{ $ing.backendPath }}
+            pathType: {{ $cfg.pathType | default "Prefix" }}
             backend:
               service:
                 name: {{ .Values.inventory.name }}
@@ -32,15 +49,15 @@ spec:
                   name: http
           {{- end }}
           {{- if .Values.frontend.enabled }}
-          - path: {{ .Values.ingress.frontendPath }}
-            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+          - path: {{ $ing.frontendPath }}
+            pathType: {{ $cfg.pathType | default "Prefix" }}
             backend:
               service:
                 name: {{ .Values.frontend.name }}
                 port:
                   name: http
           {{- end }}
-          {{- if not (or .Values.frontend.enabled .Values.inventory.enabled) }}
-          {{- fail "ingress.enabled is true but neither frontend nor inventory is enabled" }}
-          {{- end }}
+      {{- with $ing.host }}
+      host: {{ . | quote }}
+      {{- end }}
 {{- end }}

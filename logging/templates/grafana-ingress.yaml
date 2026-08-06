@@ -1,33 +1,49 @@
-{{- if and .Values.grafana.enabled .Values.grafana.ingress.enabled }}
+{{- if .Values.grafana.ingress.enabled }}
+{{- $ing := .Values.grafana.ingress }}
+{{- if not (has $ing.controller (list "alb" "nginx")) }}
+{{- fail (printf "grafana.ingress.controller must be \"alb\" or \"nginx\", got %q" $ing.controller) }}
+{{- end }}
+{{- $cfg := index $ing $ing.controller }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.grafana.ingress.name }}
-  namespace: {{ include "logging.namespace" . }}
+  name: {{ $ing.name }}
+  namespace: {{ .Values.namespace.name }}
   labels:
     {{- include "logging.labels" . | nindent 4 }}
     {{- include "grafana.selectorLabels" . | nindent 4 }}
   annotations:
-    {{- with .Values.grafana.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-    {{- with .Values.grafana.ingress.groupName }}
+  {{- if eq $ing.controller "alb" }}
+    alb.ingress.kubernetes.io/scheme: {{ $cfg.scheme }}
+    alb.ingress.kubernetes.io/target-type: {{ $cfg.targetType }}
+    alb.ingress.kubernetes.io/listen-ports: {{ $cfg.listenPorts | quote }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $cfg.healthcheckPath }}
+    {{- with $cfg.groupName }}
     alb.ingress.kubernetes.io/group.name: {{ . }}
     {{- end }}
+  {{- else if eq $ing.controller "nginx" }}
+    nginx.ingress.kubernetes.io/ssl-redirect: {{ $cfg.sslRedirect | quote }}
+    nginx.ingress.kubernetes.io/use-regex: {{ $cfg.useRegex | quote }}
+    {{- with $cfg.rewriteTarget }}
+    nginx.ingress.kubernetes.io/rewrite-target: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- with $cfg.extraAnnotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  ingressClassName: {{ .Values.grafana.ingress.className }}
+  ingressClassName: {{ $cfg.className }}
   rules:
-    -
-      {{- if .Values.grafana.ingress.host }}
-      host: {{ .Values.grafana.ingress.host | quote }}
-      {{- end }}
-      http:
+    - http:
         paths:
-          - path: {{ .Values.grafana.ingress.path }}
-            pathType: {{ .Values.grafana.ingress.pathType }}
+          - path: {{ $ing.path }}
+            pathType: {{ $cfg.pathType }}
             backend:
               service:
                 name: {{ .Values.grafana.name }}
                 port:
-                  name: http
+                  number: {{ .Values.grafana.service.port }}
+      {{- with $ing.host }}
+      host: {{ . }}
+      {{- end }}
 {{- end }}

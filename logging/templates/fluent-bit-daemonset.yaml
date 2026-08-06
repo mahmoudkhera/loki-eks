@@ -64,8 +64,10 @@ spec:
             # whole tree has to be mounted for the tail input to resolve them.
             - name: varlog
               mountPath: /var/log
+            {{- if .Values.fluentBit.dockerRuntime.enabled }}
             - name: varlibdockercontainers
               mountPath: /var/lib/docker/containers
+            {{- end }}
             - name: positions
               mountPath: /var/log/fluent-bit
               readOnly: true
@@ -78,10 +80,12 @@ spec:
           hostPath:
             path: /var/log
             type: Directory
+        {{- if .Values.fluentBit.dockerRuntime.enabled }}
         - name: varlibdockercontainers
           hostPath:
             path: /var/lib/docker/containers
             type: Directory
+        {{- end }}
         - name: positions
           hostPath:
             path: /var/log/fluent-bit
