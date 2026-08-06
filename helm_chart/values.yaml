@@ -177,21 +177,21 @@ notifications:
 ingress:
   enabled: true
   name: app-ingress
-  className: nginx
+  className: alb.ingress.kubernetes.io/healthcheck-path:
   # Leave empty to serve on the ALB's own DNS name with no host rule.
   host: ""
   # Share one ALB with the grafana ingress in the logging chart.
   groupName: stockwatch
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "false"
 
-  #   alb.ingress.kubernetes.io/scheme: internet-facing
-  #   alb.ingress.kubernetes.io/target-type: ip
-  #   alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-  #   # ALB health checks are set per ingress, not per backend: every service
-  #   # behind this one must answer 200 on this path or its targets go unhealthy.
-  #   alb.ingress.kubernetes.io/healthcheck-path: /healthz
-  # # Evaluated in order, so the longest prefix goes first.
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    # ALB health checks are set per ingress, not per backend: every service
+    # behind this one must answer 200 on this path or its targets go unhealthy.
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+  # Evaluated in order, so the longest prefix goes first.
   backendPath: /backend
   frontendPath: /
   pathType: Prefix

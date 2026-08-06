@@ -1,8 +1,12 @@
-data "aws_caller_identity" "current" {}
 
+
+# This block builds a default bucket name when the user doesn't supply one
+# Queries STS for who Terraform is running as, exposing account_id, arn, and user_id.
+# No arguments, no cost, no permissions needed beyond valid credentials.
+data "aws_caller_identity" "current" {}
 locals {
   loki_bucket_name = var.loki_bucket_name != null && trimspace(var.loki_bucket_name) != "" ? var.loki_bucket_name : substr(
-    regexreplace(lower("loki-${var.cluster_name}-${var.environment}-${data.aws_caller_identity.current.account_id}"), "[^a-z0-9-]+", "-"),
+    replace(lower("loki-${var.cluster_name}-${var.environment}-${data.aws_caller_identity.current.account_id}"), "/[^a-z0-9-]+/", "-"),
     0,
     63,
   )
@@ -53,6 +57,9 @@ resource "aws_s3_bucket_public_access_block" "loki_logs" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# aws_iam_policy_document is a helper that builds IAM JSON from HCL. It creates nothing;
+# you consume .json and hand it to a resource.
 
 data "aws_iam_policy_document" "loki_assume_role" {
   statement {

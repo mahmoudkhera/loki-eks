@@ -14,7 +14,7 @@ loki:
     create: true
     name: loki
     # Set to the loki_irsa_role_arn output from terraform when storage.type is s3.
-    roleArn: ""
+    roleArn: "s3_arn"
     annotations: {}
   service:
     type: ClusterIP
@@ -23,7 +23,7 @@ loki:
   # s3 matches the infra defaults (enable_loki_bucket = true).
   # Use filesystem only for a throwaway install - the data dies with the pod.
   storage:
-    type: filesystem
+    type: s3
     s3:
       # terraform output loki_bucket_name
       bucketName: "bucketname"
@@ -107,7 +107,7 @@ grafana:
     enabled: true
     name: grafana-ingress
     
-    className: nginx
+    className: alb.ingress.kubernetes.io/healthcheck-path:
     # Leave empty to serve on the ALB's own DNS name with no host rule.
     host: ""
     # path: /grafan(/|$)(.*)
@@ -116,12 +116,12 @@ grafana:
     # pathType:  ImplementationSpecific
     # Reuse the stockwatch ALB instead of paying for a second one. Must match
     # the group.name on the other chart's ingress.
-    # groupName: stockwatch
+    groupName: stockwatch
     annotations:
-      # alb.ingress.kubernetes.io/scheme: internet-facing
-      # alb.ingress.kubernetes.io/target-type: ip
-      # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-      # alb.ingress.kubernetes.io/healthcheck-path: /api/health
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+      alb.ingress.kubernetes.io/healthcheck-path: /api/health
       # nginx.ingress.kubernetes.io/use-regex: "true"
       # nginx.ingress.kubernetes.io/rewrite-target: /$2
 

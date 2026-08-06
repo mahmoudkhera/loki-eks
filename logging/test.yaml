@@ -1,0 +1,16 @@
+---
+# Source: logging/templates/loki-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: logging
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: logging-0.1.0
+    app: loki
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: logging
+  annotations:
+    eks.amazonaws.com/role-arn: "s3_arn"

@@ -38,7 +38,7 @@ output "cost_notes" {
   value = {
     control_plane_usd       = "73.00 (fixed, $0.10/hr - upgrade before month 14 or it becomes 438.00)"
     nat_gateway_usd         = var.enable_nat_gateway ? "~33.00 per gateway + $0.045/GB processed" : "0.00 (disabled)"
-    nodes                   = "${var.node_desired_size} x ${join(local.instance_types, "/")} on ${var.capacity_type}"
+    # nodes                   = "${var.node_desired_size} x ${join(local.instance_types, "/")} on ${var.capacity_type}"
     public_ipv4_usd         = var.enable_nat_gateway ? "0.00 (nodes are private)" : format("~%.2f (%d nodes x $3.65/mo)", var.node_desired_size * 3.65, var.node_desired_size)
     ebs_usd                 = format("~%.2f (%d x %d GB gp3)", var.node_desired_size * var.node_disk_size * 0.08, var.node_desired_size, var.node_disk_size)
     cloudwatch_logs         = var.enable_cluster_logging ? "ENABLED - billed ~$0.50/GB ingested" : "0.00 (disabled)"

@@ -1,0 +1,311 @@
+
+to know 
+aws eks update-kubeconfig --region us-east-1 --name stockwatch
+
+kubectl config current-context
+
+
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+
+helm install argocd argo/argo-cd \
+  --namespace argocd --create-namespace \
+  --version 7.7.* \
+  --set configs.params."server\.insecure"=true
+
+
+  kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+
+
+  kubectl port-forward -n argocd svc/argocd-server 8080:443
+
+  kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.allocatable.pods}{"\n"}{end}'
+
+
+helm repo add sealed-secrets https://bitnami.github.io/sealed-secrets
+helm repo update
+
+helm install sealed-secrets sealed-secrets/sealed-secrets \
+  --namespace sealed-secrets \
+  --create-namespace
+
+
+
+  helm repo add eks https://aws.github.io/eks-charts
+  helm repo update
+
+
+
+  helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=stockwatch \
+  --set region=us-east-1 \
+  --set vpcId=<vpc-id> \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<role-arn>
+
+  kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+  
+kubectl get ingressclass alb
+
+
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[?starts_with(LoadBalancerName, `k8s-stockwatch`)].[State.Code,Scheme,Type]' \
+  --output table
+
+
+  kubectl get secret smtp-secrets --all-namespaces
+
+
+  kubectl label secret <your-new-key-secret-name> \
+  sealedsecrets.bitnami.com/sealed-secrets-key=active \
+  -n sealed-secrets
+
+
+
+
+
+  destroying 
+
+  # 0. stop GitOps from recreating what you delete
+kubectl -n argocd patch app stockwatch --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":null}}}'
+# or: kubectl delete app --all -n argocd
+
+# 1. delete the objects that own AWS resources
+kubectl delete ingress --all --all-namespaces
+kubectl delete svc --all-namespaces --field-selector spec.type=LoadBalancer
+kubectl delete pvc --all --all-namespaces
+
+# 2. wait for AWS to finish — deletion is asynchronous
+sleep 90
+
+# 3. verify nothing is left
+aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName' --output text
+aws elbv2 describe-target-groups --query 'TargetGroups[?starts_with(TargetGroupName, `k8s-`)].TargetGroupName' --output text
+aws ec2 describe-volumes --filters Name=status,Values=available \
+  --query 'Volumes[].VolumeId' --output text
+
+# 4. only now
+terraform destroy
+
+
+
+kubectl apply -f fluent-bit-configmap.yaml
+kubectl rollout restart daemonset/fluent-bit -n logging
+kubectl rollout status daemonset/fluent-bit -n logging
+
+
+curl -s 'http://localhost:3100/loki/api/v1/labels' | jq
+curl -s 'http://localhost:3100/loki/api/v1/label/app/values' | jq
+
+START=$(( ($(date +%s) - 300) * 1000000000 ))
+curl -s "http://localhost:3100/loki/api/v1/labels?start=$START" | jq
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: logging
+  labels:
+    app: fluent-bit
+data:
+  fluent-bit.conf: |
+
+    [SERVICE]
+        Flush                     5
+        Log_Level                 info
+        Daemon                    off
+        Parsers_File              parsers.conf
+
+        HTTP_Server               On
+        HTTP_Listen               0.0.0.0
+        HTTP_Port                 2020
+        storage.metrics           On
+
+
+    [INPUT]
+        Name                      tail
+        Tag                       kube.*
+        Path                      /var/log/containers/inventory*.log,/var/log/containers/notifactions*.log,/var/log/containers/frontend*.log
+
+        multiline.parser          docker, cri
+
+        DB                        /var/log/flb-storage/flb_kube.db
+        DB.locking                true
+        Mem_Buf_Limit             50MB
+        Skip_Long_Lines           On
+        Refresh_Interval          10
+
+    [FILTER]
+        Name                      kubernetes
+        Match                     kube.*
+
+        Kube_Tag_Prefix           kube.var.log.containers.
+        # In-cluster API server (used to look up pod metadata).
+        Kube_URL                  https://kubernetes.default.svc:443
+        Kube_CA_File              /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File           /var/run/secrets/kubernetes.io/serviceaccount/token
+        # Try to parse the app's 'log' field as JSON; on success, merge its
+        # keys into the record root (structured logging).
+        Merge_Log                 On
+   
+        K8S-Logging.Parser        On
+        K8S-Logging.Exclude       On
+        # We only consume labels.app, so fetch pod labels but skip annotations.
+        Labels                    On
+        Annotations               Off
+        # Cache API lookups per pod for 60s to reduce API server load.
+        Kube_Meta_Cache_TTL       60s
+
+    # FILTER 2: drop kubelet health/probe noise
+    [FILTER]
+        Name                      grep
+        Match                     kube.*
+        Exclude                   log (healthz|readiness|liveness)
+
+    # FILTER 3: strip CRI bookkeeping fields from the record body
+    [FILTER]
+        Name                      modify
+        Match                     kube.*
+        Remove                    time
+        Remove                    _p
+    [FILTER]
+        Name          nest
+        Match         kube.*
+        Operation     lift
+        Nested_under  kubernetes
+        Add_prefix    k8s_
+    # OUTPUT: push to Loki
+    [OUTPUT]
+        Name                      loki
+        Match                     kube.*
+        Host                      loki.logging.svc.cluster.local
+        Port                      3100
+
+        Labels                    agent=fluent-bit, app=$kubernetes['labels']['app']
+        Auto_Kubernetes_Labels    off
+
+        Remove_Keys               kubernetes, stream
+        Line_Format               json
+        storage.total_limit_size  200M
+        Retry_Limit               5
+        compress                  gzip
+
+  parsers.conf: |
+    # Single-line JSON parser. Only used when a pod explicitly requests it via
+    # the annotation  fluentbit.io/parser: docker  (K8S-Logging.Parser must be On).
+    #
+    # IMPORTANT: we deliberately DO NOT define a '[MULTILINE_PARSER] cri' here.
+    # Fluent Bit's built-in 'cri' parser emits the message under 'log' (which
+    # Merge_Log needs). Redefining it to emit 'message'/'flag' would break both
+    # Merge_Log and leak the flag field into every log line.
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%LZ
+        Time_Keep   On
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluent-bit
+  namespace: logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluent-bit-read
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluent-bit-read
+subjects:
+  - kind: ServiceAccount
+    name: fluent-bit
+    namespace: logging
+roleRef:
+  kind: ClusterRole
+  name: fluent-bit-read
+  apiGroup: rbac.authorization.k8s.io
