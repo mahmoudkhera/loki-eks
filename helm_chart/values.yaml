@@ -30,7 +30,7 @@ frontend:
   replicas: 3
   image:
     repository: registry.gitlab.com/mahmoudkhera20/microservice-devops/frontend
-    tag: latest
+    tag: 20260716185934-d42c51cd
     pullPolicy: ""
   containerPort: 8000
   service:
@@ -134,7 +134,7 @@ notifications:
   replicas: 1
   image:
     repository: registry.gitlab.com/mahmoudkhera20/microservice-devops/notifications-service
-    tag: latest
+    tag: 20260716185231-002816ea
     pullPolicy: ""
   containerPort: 3002
   service:

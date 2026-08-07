@@ -14,7 +14,7 @@ loki:
     create: true
     name: loki
     # Set to the loki_irsa_role_arn output from terraform when storage.type is s3.
-    roleArn: "s3_arn"
+    roleArn: "arn:aws:iam::139961318512:role/stockwatch-loki-s3"
     annotations: {}
   service:
     type: ClusterIP
@@ -26,7 +26,7 @@ loki:
     type: s3
     s3:
       # terraform output loki_bucket_name
-      bucketName: "bucketname"
+      bucketName: "loki-stockwatch-dev-139961318512"
       region: us-east-1
 
       forcePathStyle: false
@@ -71,6 +71,7 @@ fluentBit:
     create: true
   dockerRuntime:
     enabled: false
+    
   # Namespaces whose logs are dropped before they reach Loki.
   excludeNamespaces:
     - kube-system
@@ -104,7 +105,7 @@ grafana:
     port: 80
     targetPort: 3000
   # Grafana serves from / by default. Set rootUrl if you put it behind a path.
-  rootUrl: ""
+  rootUrl: "http://k8s-stockwatch-18c9459418-1339069595.us-east-1.elb.amazonaws.com/grafana/"
   ingress:
     enabled: true
     name: grafana-ingress

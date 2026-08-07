@@ -16,6 +16,7 @@ resource "aws_s3_bucket" "loki_logs" {
   count = var.enable_loki_bucket ? 1 : 0
 
   bucket = local.loki_bucket_name
+  force_destroy = true
 
   tags = {
     Name        = local.loki_bucket_name
